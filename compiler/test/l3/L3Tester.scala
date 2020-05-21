@@ -89,4 +89,41 @@ object L3Tester {
       andThen ASMLabelResolver
       andThen ASMInterpreter
   )
+
+
+
+  /* THIS LAST PART WAS ADDED */
+  /* CAN BE REMOVED */
+  /* ADDED FOR TREEPRINTING */
+
+  import java.io.PrintWriter
+  import java.nio.file.{Files, Paths}
+
+  import l3.SymbolicCL3TreeModule.Tree
+
+  import CL3TreeFormatter._ // Implicits required for CL3 tree printing
+  import CPSTreeFormatter._ // Implicits required for CPS tree printing
+  import CPSTreeChecker._ // Implicits required for CPS tree checking
+
+  private lazy val outPrintWriter =
+    new PrintWriter(System.out, true)
+
+  private def treeChecker[T <: CPSTreeModule](implicit c: CPSTreeChecker[T]) =
+    passThrough(c)
+
+  private def treePrinter[T](msg: String)(implicit f: Formatter[T]): T => T =
+    passThrough { tree =>
+      outPrintWriter.println(msg)
+      f.toDoc(tree).writeTo(80, outPrintWriter)
+      outPrintWriter.println()
+    }
+
+  private def seqPrinter[T](msg: String): Seq[T] => Seq[T] =
+    passThrough { program =>
+      outPrintWriter.println(msg)
+      program foreach outPrintWriter.println
+    }
+
+  private def passThrough[T](f: T => Unit): T => T = { t: T => f(t); t }
+
 }
