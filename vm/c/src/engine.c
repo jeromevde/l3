@@ -131,6 +131,24 @@ static value_t* ret(value_t ret_value) {
 #define Rb (R[reg_bank(instr_rb(*pc))][reg_index(instr_rb(*pc))])
 #define Rc (R[reg_bank(instr_rc(*pc))][reg_index(instr_rc(*pc))])
 
+#define GOTO_NEXTT    \
+  printf("\nNEXT INSTRCTION: %d: \n", instr_opcode(*pc)); \
+  printf("   Ra:(%d,%d),%d,%p \n", reg_bank(instr_ra(*pc)), reg_index(instr_ra(*pc)), Ra, (void*)&Ra); \
+  printf("   Rb:(%d,%d),%d,%p \n", reg_bank(instr_rb(*pc)), reg_index(instr_rb(*pc)), Rb, (void*)&Rb); \
+  printf("   Rc:(%d,%d),%d,%p \n", reg_bank(instr_rc(*pc)), reg_index(instr_rc(*pc)), Rc, (void*)&Rc); \
+  for (uint8_t i = 0; i < 8;++i) {\
+    for (uint8_t j = 0; j < 8; ++j) \
+    {  \
+      /*printf("reg(%d,%d):%d|||",i,j,R[i][j] ); */\
+    } \
+    } \
+  for (uint8_t i = 0; i < 0; i++) \
+  { \
+    printf(" \n   following instruction%d:%d",i, instr_opcode(pc[i])); \
+  } \
+  fflush(stdout);  \
+  goto *labels[instr_opcode(*pc)]
+
 #define GOTO_NEXT goto *labels[instr_opcode(*pc)]
 
 value_t engine_run() {
@@ -173,6 +191,7 @@ value_t engine_run() {
     };
 
   GOTO_NEXT;
+
 
  l_ADD: {
     Ra = Rb + Rc;
@@ -324,6 +343,8 @@ value_t engine_run() {
  l_BGET: {
     value_t* block = addr_v_to_p(Rb);
     value_t index = Rc;
+    if(index >= memory_get_block_size(block)) printf("\n\nindex:%d,size:%d   ",index,memory_get_block_size(block));
+    fflush(stdout);
     assert(index < memory_get_block_size(block));
     Ra = block[index];
     pc += 1;
