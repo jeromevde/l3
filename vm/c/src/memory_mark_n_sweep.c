@@ -44,10 +44,6 @@ static value_t addr_p_to_v(void* p_addr) {
 
 // Memory/size alignment
 
-static size_t align_down(size_t value, size_t align) {
-  assert(align > 0 && (align & (align - 1)) == 0); /* check power of 2 */
-  return value & ~(align - 1);
-}
 
 static void* align_up(void* address, size_t align) {
   assert(align > 0 && (align & (align - 1)) == 0); /* check power of 2 */
@@ -83,41 +79,38 @@ void* memory_get_end() {
 
 
 
-// BITMAP =================================================================================================================================
+// BITMAP =========================================================================================================================
 typedef struct {
   size_t size;
   value_t *bits; // the bit array data; points to a region of the memory allocated for the program
 } bitmap_t;
 static bitmap_t bitmap = {0, NULL};
 
-static const unsigned cell_bits = sizeof(*bitmap.bits) * CHAR_BIT;
-static value_t log2_cell_bits; // initialized in the memory_setup function
-
-static unsigned myctz(unsigned b) {
+/* BITMAP constants */
+static unsigned log2_p2(unsigned x) {
   unsigned n = 0;
-  while ((b >>= 1) && ++n)
-    ;
+  while (x >>= 1) {++n;}
   return n;
 }
-#define log2_p2(x) (myctz(x))
+static const unsigned bits_per_word = sizeof(*bitmap.bits) * CHAR_BIT;
+static value_t log2_bits_per_word;
+
+/* BITMAP macros */
 #define div32_p2(x, k) (((x) + (((x) >> 31) & ((1 << (k)) - 1))) >> (k))
 #define mod_p2(x, n) ((x) & ((n)-1))
-/* macros to help with bit array operations */
-#define cell(idx) (div32_p2((idx), log2_cell_bits))
-#define set_mask(idx) (1u << mod_p2(idx, cell_bits))
-#define clear_mask(idx) (~(set_mask(idx)))
-/* bit array operations */
-#define bitarray_set(idx) (bitmap.bits[cell(idx)] |= set_mask(idx))
-#define bitarray_clear(idx) (bitmap.bits[cell(idx)] &= clear_mask(idx))
-#define bitarray_test(idx) (bitmap.bits[cell(idx)] & set_mask(idx))
+#define index(idx) (div32_p2((idx), log2_bits_per_word))
+#define one_mask(idx) (1u << mod_p2(idx, bits_per_word))
+#define zero_mask(idx) (~(one_mask(idx)))
+#define bitarray_set(idx) (bitmap.bits[index(idx)] |= one_mask(idx))
+#define bitarray_clear(idx) (bitmap.bits[index(idx)] &= zero_mask(idx))
+#define bitarray_test(idx) (bitmap.bits[index(idx)] & one_mask(idx))
 
-// Initializes the bit array size and pointer, as well as the log2(cell_bits) quantity.
 static void bitarray_init(size_t size, value_t *base) {
   bitmap.size = size;
   bitmap.bits = base;
-  log2_cell_bits = log2_p2(cell_bits); // used for quick division, see div32_p2 macro above
+  log2_bits_per_word = log2_p2(bits_per_word); 
 }
-// ==============================================================================================================================
+// ================================================================================================================================
 
 static value_t free_list_head = 0x0;  //virtual address to where the freelist start, used stack-wise
 // now pointing (virtually) to memory_start but will be updated to point to blocks_start
@@ -140,25 +133,27 @@ void memory_set_heap_start(void* heap_start) {
     heap_size_left = total_heap_size - bitmap_size;
   } while (calc_bitmap_size(heap_size_left) != bitmap_size);
   //do until bitmap_size converges down to correct size
-
-  
   bitarray_init(bitmap_size, heap_start);
-  //bitmap_size += alignof(value_t) - (bitmap_size & (alignof(value_t) - 1));
-  blocks_start = (value_t *)((char *)heap_start + bitmap_size);
-  blocks_start = align_up(blocks_start, alignof(value_t));
-  
-  if ((void*) (blocks_start + HEADER_SIZE) >= memory_end)
-    fail("not enough memory to load bitmap");
 
+  char * blocks_start_unaligned = ((char *)heap_start + bitmap_size);
+  blocks_start = (value_t *)align_up(blocks_start_unaligned, alignof(value_t));
+  if ((blocks_start + HEADER_SIZE) >= memory_end)
+    fail("not enough memory to load bitmap");
   *blocks_start = header_pack(tag_None, (value_t)(memory_end - blocks_start) - HEADER_SIZE);
 
-  free_list_head = addr_p_to_v(blocks_start);
   blocks_start[HEADER_SIZE] = 0x0; // end of the free list is marked by a pointer to memory_start !
+  free_list_head = addr_p_to_v(blocks_start);
 }
+
+
+
+//=================================================================================================================================
+// start of GARBAGE COLLECTOR
+//=================================================================================================================================
 
 // a block is allocated if withing valid bounds and its bit is set in the bitmap
 // do not follow if bit is not set -> random part of heap considered as block would break the vm (no valid size etc.)
-// the bitmap bits are set at the physical block address (before HEADER) not virtual block (after HEADER)
+// the bitmap bits are set at the physical block address (before HEADER) not the virtual block (after HEADER)
 #define is_allocated_block(va)                                                                     \
   (blocks_start < (va) && (va) < memory_end && bitarray_test((va)-blocks_start - HEADER_SIZE))
 
@@ -178,19 +173,18 @@ void memory_set_heap_start(void* heap_start) {
       b) can be recognized by bit set to 0 and distinguished from a) with tag_None
 */
 static void mark_rec(value_t *addr) {
-
     if (!addr_p_to_v(addr))  //null block
     return;
 
     bitarray_clear(addr - blocks_start - HEADER_SIZE); // mark the current physical block, before header!
-    printf("\n  mark cleared a bit at virtual address %d because the block is reachable", addr_p_to_v(addr));
+
+    //printf("\n  mark cleared a bit for virtual address %d because the block is reachable", addr_p_to_v(addr));
     value_t size = header_unpack_size(addr[-1]); // get size of this block
     for(value_t i = 0; i<size; ++i){
-      if (addr[i] & 0x3)  //pointers value contains address to 32 bits words! 4 bytes aligned!
-        continue; // if element cannot be a pointer, go to next
-      value_t *blockp = (value_t *)addr_v_to_p(addr[i]);
-      if (is_allocated_block(blockp)) // this element points to a heap allocated block
-        mark_rec(blockp);             // recursively mark the block it points to
+      if (!(addr[i] & 0x3)){   //pointers value contains address to 32 bits words! 4 bytes aligned!
+        value_t *blockp = (value_t *)addr_v_to_p(addr[i]);
+        if (is_allocated_block(blockp)) mark_rec(blockp);            
+      }
     }
 }
 
@@ -240,46 +234,42 @@ static void coalesce(value_t *start, value_t *end) {
   and making jumps of the appropriate length
 */
 static void sweep(){
-
   value_t *sweeper = blocks_start;                 
   value_t *first_free_block = sweeper;  
 
   free_list_head = 0x0; //end of free list is marked (virtually) by pointer to memory_start!
 
   while (sweeper != memory_end){ //memory_end not inclusive, if block sizes are correct
-
     const tag_t tag = header_unpack_tag(*sweeper);
     value_t size = header_unpack_size(*sweeper);
     size += (size == 0);
-    if (bitarray_test(sweeper - blocks_start) ||  tag == tag_None) {
-        bitarray_clear(sweeper - blocks_start); 
-        printf("\n  sweeping found free block at %d", sweeper -  blocks_start);
-        sweeper += size + HEADER_SIZE;
-        continue;
+
+    if (bitarray_test(sweeper - blocks_start) ||  tag == tag_None) { // Allocated Unreachable or Free Block
+      bitarray_clear(sweeper - blocks_start); 
+      //printf("\n  sweeping found free block at %d", sweeper -  blocks_start);
+      sweeper += size + HEADER_SIZE;
+    } else { // Allocated Reachable Block
+      coalesce(first_free_block, sweeper); // coalesce cleared block preceding this block
+      bitarray_set(sweeper - blocks_start); // bitmap from 0 to 1 because it is a reachable block
+      sweeper += size + HEADER_SIZE;
+      first_free_block = sweeper;
     }
-
-    // Allocated Reachable Block
-    coalesce(first_free_block, sweeper); // coalesce blocks between first_free_block and sweeper
-    bitarray_set(sweeper - blocks_start); // set the bitmap entry (was 0)
-    sweeper += size + HEADER_SIZE; // advance sweeper
-    first_free_block = sweeper;
-
   }
 
-  // coalesce the last free block, if any
+  // coalesce the (possible) last free block
   coalesce(first_free_block, sweeper);
 }
 
 
 /*
-  Mark & Sweep garbage collector
+  Mark & Sweep SINGLE FREE LIST garbage collector
 */
 static void garbage_collect(){
-  printf("\nMARKING ----------------------------------------------");
+  //printf("\nMARKING ----------------------------------------------");
   mark();
-  printf("\nSWEEPING ---------------------------------------------");
+  //printf("\nSWEEPING ---------------------------------------------");
   sweep();
-  printf("\nENDING garbage collect -------------------------------\n");
+  //printf("\nENDING garbage collect -------------------------------\n");
   fflush(stdout);
 }
 
@@ -292,7 +282,7 @@ static void garbage_collect(){
            tag_None is used to distinguish this block from allocated unreachable blocks during sweep
            rest_block is added on top (stack-wise) of the free list
 */
-static void add_split_to_free(value_t* block_p, value_t size){
+static void add_rest_to_free(value_t* block_p, value_t size){
   const value_t block_size = header_unpack_size(*block_p);
 
   if (block_size == size) //nothing to do
@@ -316,16 +306,15 @@ static void add_split_to_free(value_t* block_p, value_t size){
 */
 static value_t* get_physical_block(tag_t tag, value_t size){
   const value_t real_size = size + (size == 0); // no blocks of size 0, need room for storing a link !
-  const value_t total_size = real_size + HEADER_SIZE; // physical block with metadata in header
 
   value_t* block_pointer = addr_v_to_p(free_list_head); // pointer to current block
   value_t* previous_virtual = &free_list_head; //pointer to virtual link to current block
 
     while(block_pointer != memory_start){ 
     value_t block_size = header_unpack_size(*block_pointer);
-    if (block_size == real_size || block_size > real_size + 1) { //cannot be size + 1 ! -> split problem
+    if (block_size == real_size || block_size > real_size +  HEADER_SIZE) { //either exact size or splittable (enough room for 2 headers)
       *previous_virtual = block_pointer[HEADER_SIZE]; // remove block from freeList
-       add_split_to_free(block_pointer, real_size); //add splitted block on top of the freeList
+       add_rest_to_free(block_pointer, real_size); //add splitted block on top of the freeList
       *block_pointer = header_pack(tag, size); // write block header
        bitarray_set(block_pointer - blocks_start); // Allocated block has 1-bit in bitmap
       return block_pointer;
@@ -336,6 +325,11 @@ static value_t* get_physical_block(tag_t tag, value_t size){
 
   return NULL;
 }
+
+//=================================================================================================================================
+// end of GARBAGE COLLECTOR
+//=================================================================================================================================
+
 
 
 
@@ -350,11 +344,9 @@ value_t* memory_allocate(tag_t tag, value_t size) {
     }
   }
   value_t* vBlock = pBlock + HEADER_SIZE;
-  printf("\nAllocated block at virtual address %d of size: %d", addr_p_to_v(vBlock), memory_get_block_size(vBlock));
+  //printf("\nAllocated block at virtual address %d of size: %d", addr_p_to_v(vBlock), memory_get_block_size(vBlock));
   return vBlock;
 }
-
-
 
 value_t memory_get_block_size(value_t* block) {
   return header_unpack_size(block[-1]);
