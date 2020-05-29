@@ -285,6 +285,9 @@ static void mark_rec(value_t *addr) {
 static void mark() {
   value_t *reg = NULL;
 
+  reg = engine_get_Cb();
+  mark_rec(reg); // recursively mark block pointed to by Ob
+
   reg = engine_get_Ob();
   mark_rec(reg); // recursively mark block pointed to by Ob
 

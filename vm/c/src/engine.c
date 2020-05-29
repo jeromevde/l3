@@ -131,7 +131,7 @@ static value_t* ret(value_t ret_value) {
 #define Rb (R[reg_bank(instr_rb(*pc))][reg_index(instr_rb(*pc))])
 #define Rc (R[reg_bank(instr_rc(*pc))][reg_index(instr_rc(*pc))])
 
-#define GOTO_NEXTT    \
+#define GOTO_NEXTTT   \
   printf("\nNEXT INSTRCTION: %d: \n", instr_opcode(*pc)); \
   printf("   Ra:(%d,%d),%d,%p \n", reg_bank(instr_ra(*pc)), reg_index(instr_ra(*pc)), Ra, (void*)&Ra); \
   printf("   Rb:(%d,%d),%d,%p \n", reg_bank(instr_rb(*pc)), reg_index(instr_rb(*pc)), Rb, (void*)&Rb); \
@@ -139,7 +139,7 @@ static value_t* ret(value_t ret_value) {
   for (uint8_t i = 0; i < 8;++i) {\
     for (uint8_t j = 0; j < 8; ++j) \
     {  \
-      /*printf("reg(%d,%d):%d|||",i,j,R[i][j] ); */\
+      printf("reg(%d,%d):%d|||",i,j,R[i][j] ); */\
     } \
     } \
   for (uint8_t i = 0; i < 0; i++) \
@@ -149,7 +149,20 @@ static value_t* ret(value_t ret_value) {
   fflush(stdout);  \
   goto *labels[instr_opcode(*pc)]
 
-#define GOTO_NEXT goto *labels[instr_opcode(*pc)]
+
+#define GOTO_NEXTT   \
+  printf("\n\nNEXT INSTRCTION: %d:", instr_opcode(*pc)); \
+  for (uint8_t i = 0; i < 2; i++) \
+  { \
+    printf(" \n   %d'th instruction:%d",i+2, instr_opcode(pc[i+1])); \
+  } \
+  fflush(stdout);  \
+  goto *labels[instr_opcode(*pc)]
+
+
+  #define GOTO_NEXT goto *labels[instr_opcode(*pc)]
+
+
 
 value_t engine_run() {
   instr_t* pc = memory_start;
