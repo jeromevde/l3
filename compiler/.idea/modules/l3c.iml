@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module external.linked.project.id="root [file:/home/jerome/Desktop/l3/compiler/]" external.linked.project.path="$MODULE_DIR$/../.." external.root.project.path="$MODULE_DIR$/../.." external.system.id="SBT" type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_14">
+    <output url="file://$MODULE_DIR$/../../target/scala-2.13/classes" />
+    <output-test url="file://$MODULE_DIR$/../../target/scala-2.13/test-classes" />
+    <exclude-output />
+    <content url="file://$MODULE_DIR$/../..">
+      <sourceFolder url="file://$MODULE_DIR$/../../src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../test" isTestSource="true" />
+      <excludeFolder url="file://$MODULE_DIR$/../../target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="sbt: com.lihaoyi:fastparse_2.13:2.2.2:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.lihaoyi:geny_2.13:0.4.2:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.lihaoyi:sourcecode_2.13:0.1.7:jar" level="project" />
+    <orderEntry type="library" scope="TEST" name="sbt: com.lihaoyi:utest_2.13:0.7.3:jar" level="project" />
+    <orderEntry type="library" scope="TEST" name="sbt: org.portable-scala:portable-scala-reflect_2.13:0.1.1:jar" level="project" />
+    <orderEntry type="library" name="sbt: org.scala-lang:scala-library:2.13.1:jar" level="project" />
+    <orderEntry type="library" scope="TEST" name="sbt: org.scala-lang:scala-reflect:2.13.1:jar" level="project" />
+    <orderEntry type="library" scope="TEST" name="sbt: org.scala-sbt:test-interface:1.0:jar" level="project" />
+    <orderEntry type="library" name="sbt: org.typelevel:paiges-core_2.13:0.3.0:jar" level="project" />
+    <orderEntry type="module-library">
+      <library name="sbt: unmanaged-jars">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/../../lib/l3_cl3_to_cps_and_value_representation.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+  </component>
+</module>

@@ -14,13 +14,13 @@ object Main {
     val backEnd: Tree => TerminalPhaseResult = (
       // CL3Interpreter
       CL3ToCPSTranslator
-        // andThen treePrinter("---------- After translation to CPS")
-        andThen CPSOptimizerHigh
+        andThen treePrinter("---------- After translation to CPS")
+        //andThen CPSOptimizerHigh
         // andThen treePrinter("---------- After high optimization")
         // andThen CPSInterpreterHigh
         andThen CPSValueRepresenter
         andThen CPSHoister
-        // andThen treePrinter("---------- After value representation")
+        andThen treePrinter("---------- After value representation")
         andThen CPSOptimizerLow
         // andThen treePrinter("---------- After low optimization")
         // andThen CPSInterpreterLow

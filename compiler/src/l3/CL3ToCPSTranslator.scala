@@ -14,7 +14,6 @@ object CL3ToCPSTranslator extends (S.Tree => C.Tree) {
 
     tree match {
       case S.Let(bindings: Seq[(S.Name, S.Tree)], body: S.Tree) =>
-
         bindings match {
           case Seq(b, r@_*) =>
             nonTail(b._2) { v =>

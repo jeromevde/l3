@@ -80,11 +80,8 @@ void* memory_get_end() {
 
 
 // BITMAP =========================================================================================================================
-typedef struct {
-  size_t size;
-  value_t *bits; // the bit array data; points to a region of the memory allocated for the program
-} bitmap_t;
-static bitmap_t bitmap = {0, NULL};
+typedef value_t * bitmap_t; // the bit array data; points to a region of the memory allocated for the program
+static bitmap_t bitmap = NULL;
 
 /* BITMAP constants */
 static unsigned log2_p2(unsigned x) {
@@ -92,7 +89,7 @@ static unsigned log2_p2(unsigned x) {
   while (x >>= 1) {++n;}
   return n;
 }
-static const unsigned bits_per_word = sizeof(*bitmap.bits) * CHAR_BIT;
+static const unsigned bits_per_word = sizeof(*bitmap) * CHAR_BIT;
 static value_t log2_bits_per_word;
 
 /* BITMAP macros */
@@ -101,13 +98,12 @@ static value_t log2_bits_per_word;
 #define index(idx) (div32_p2((idx), log2_bits_per_word))
 #define one_mask(idx) (1u << mod_p2(idx, bits_per_word))
 #define zero_mask(idx) (~(one_mask(idx)))
-#define bitarray_set(idx) (bitmap.bits[index(idx)] |= one_mask(idx))
-#define bitarray_clear(idx) (bitmap.bits[index(idx)] &= zero_mask(idx))
-#define bitarray_test(idx) (bitmap.bits[index(idx)] & one_mask(idx))
+#define bitarray_set(idx) (bitmap[index(idx)] |= one_mask(idx))
+#define bitarray_clear(idx) (bitmap[index(idx)] &= zero_mask(idx))
+#define bitarray_test(idx) (bitmap[index(idx)] & one_mask(idx))
 
-static void bitarray_init(size_t size, value_t *base) {
-  bitmap.size = size;
-  bitmap.bits = base;
+static void bitmap_init(value_t *base) {
+  bitmap = base;
   log2_bits_per_word = log2_p2(bits_per_word); 
 }
 // ================================================================================================================================
@@ -133,7 +129,7 @@ void memory_set_heap_start(void* heap_start) {
     heap_size_left = total_heap_size - bitmap_size;
   } while (calc_bitmap_size(heap_size_left) != bitmap_size);
   //do until bitmap_size converges down to correct size
-  bitarray_init(bitmap_size, heap_start);
+  bitmap_init(heap_start);
 
   char * blocks_start_unaligned = ((char *)heap_start + bitmap_size);
   blocks_start = (value_t *)align_up(blocks_start_unaligned, alignof(value_t));

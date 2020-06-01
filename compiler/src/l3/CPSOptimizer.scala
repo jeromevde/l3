@@ -10,7 +10,7 @@ abstract class CPSOptimizer[T <: CPSTreeModule {type Name = Symbol}]
   protected def rewrite(tree: Tree): Tree = {
     val simplifiedTree = fixedPoint(tree)(shrink)
     val maxSize = size(simplifiedTree) * 3 / 2
-    fixedPoint(simplifiedTree, 2) { t => inline(t, maxSize) }
+    fixedPoint(simplifiedTree, 8) { t => inline(t, maxSize) }
   }
 
 
@@ -344,6 +344,7 @@ abstract class CPSOptimizer[T <: CPSTreeModule {type Name = Symbol}]
         case Cnt(name, args, body: Tree) => size(body) <= cntLimit
       }
       def isInlinedC(cnt: Name)(implicit s: State): Boolean = s.cEnv.contains(cnt)
+
       def shouldInlineF(f: Fun): Boolean = f match {
         case Fun(name, retc, args, body) => size(body) <= funLimit
       }
@@ -393,7 +394,7 @@ abstract class CPSOptimizer[T <: CPSTreeModule {type Name = Symbol}]
         }
       }
 
-      (i + 1, fixedPoint(inlineT(tree)(State(census(tree))))(shrink))
+      (i + 1, fixedPoint(inlineT(tree)(State(census(tree))))(shrink)) //shrink untill fixed point is reached
     }
 
     trees.takeWhile { case (_, tree) => size(tree) <= maxSize }.last._2
